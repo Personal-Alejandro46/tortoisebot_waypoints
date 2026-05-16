@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+  <test test-name="waypoints_test"
+        pkg="tortoisebot_waypoints"
+        type="waypoints_test.py"
+        time-limit="120.0" />
+</launch>
