@@ -51,12 +51,6 @@ The test file is located at `test/waypoints_test.py`. It sends a single goal to 
 - `test_end_position` — robot reached within 0.1 m of the target
 - `test_end_yaw` — robot is oriented toward the target within 15°
 
-Run with:
-
-```bash
-rostest tortoisebot_waypoints waypoints_test.test
-```
-
 ---
 
 ## How to Test — PASS Condition
