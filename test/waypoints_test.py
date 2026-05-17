@@ -11,8 +11,13 @@ from tf import transformations
 
 TARGET_X = -0.465
 TARGET_Y = 0.34
+# TARGET_X = 2.0
+# TARGET_Y = 2.0
+MAP_RADIUS = 1.0
 PKG = 'tortoisebot_waypoints'
 
+_dist_from_origin = math.sqrt(pow(TARGET_X, 2) + pow(TARGET_Y, 2))
+_coords_valid = _dist_from_origin <= MAP_RADIUS
 class TestWaypoints(unittest.TestCase):
 
     @classmethod
@@ -22,6 +27,7 @@ class TestWaypoints(unittest.TestCase):
         cls.current_y = 0.0
         cls.current_yaw = 0.0
         cls.first_time = True
+        cls.map_error = None
 
         # Reset UMA ÚNICA VEZ para (0,0)
         rospy.wait_for_service('/gazebo/set_model_state')
@@ -40,9 +46,17 @@ class TestWaypoints(unittest.TestCase):
         while cls.first_time:
             rospy.sleep(0.05)
 
-        # Envia goal UMA ÚNICA VEZ
+        # Envia goal
         client = actionlib.SimpleActionClient('tortoisebot_as', WaypointActionAction)
         client.wait_for_server(timeout=rospy.Duration(10))
+
+        if not _coords_valid:
+            cls.map_error = ValueError(
+                "Target coordinates outside map boundaries! "
+                "TARGET=(%.3f, %.3f) distance_from_origin=%.3f m (max %.1f m)"
+                % (TARGET_X, TARGET_Y, _dist_from_origin, MAP_RADIUS)
+            )
+            return
 
         goal = WaypointActionGoal()
         goal.position.x = TARGET_X
@@ -79,19 +93,24 @@ class TestWaypoints(unittest.TestCase):
             rospy.loginfo("Start position X: %.4f | Y: %.4f" % (cls.start_pose_x, cls.start_pose_y))
 
     def test_end_position(self):
+        # Re-raise map error immediately if coordinates were invalid
+        if self.map_error:
+            raise self.map_error
+        
         err_pos = math.sqrt(pow(TARGET_Y - self.final_y, 2) + pow(TARGET_X - self.final_x, 2))
         self.assertAlmostEqual(err_pos, 0, delta=0.1,
             msg="Position error: %.4f m (max 0.1 m)" % err_pos)
-
-    def test_end_yaw(self):
-        expected_yaw = math.atan2(TARGET_Y - self.start_pose_y, TARGET_X - self.start_pose_x)
-        diff = expected_yaw - self.final_yaw
-        msg = (
-            f"final_yaw={math.degrees(self.final_yaw):.1f}deg ({self.final_yaw:.4f}rad) "
-            f"expected_yaw={math.degrees(expected_yaw):.1f}deg ({expected_yaw:.4f}rad) "
-            f"diff={math.degrees(diff):.1f}deg ({diff:.4f}rad)"
-        )
-        self.assertAlmostEqual(self.final_yaw, expected_yaw, delta=0.45, msg=msg) # 15° = 0.2618 rad
+    
+    if _coords_valid:
+        def test_end_yaw(self):
+            expected_yaw = math.atan2(TARGET_Y - self.start_pose_y, TARGET_X - self.start_pose_x)
+            diff = expected_yaw - self.final_yaw
+            msg = (
+                f"final_yaw={math.degrees(self.final_yaw):.1f}deg ({self.final_yaw:.4f}rad) "
+                f"expected_yaw={math.degrees(expected_yaw):.1f}deg ({expected_yaw:.4f}rad) "
+                f"diff={math.degrees(diff):.1f}deg ({diff:.4f}rad)"
+            )
+            self.assertAlmostEqual(self.final_yaw, expected_yaw, delta=0.45, msg=msg)
 
 if __name__ == '__main__':
     import rostest
